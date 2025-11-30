@@ -1,0 +1,90 @@
+# name: Docker Build & Deploy (Advanced)
+
+# on:
+#   push:
+#     branches:
+#       - main  # Deploy only when code is pushed to main
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v3
+
+#       - name: Login to Docker Hub
+#         uses: docker/login-action@v2
+#         with:
+#           username: ${{ secrets.DOCKER_USERNAME }}
+#           password: ${{ secrets.DOCKER_PASSWORD }}
+
+#       - name: Connect & Deploy on Production Server
+#         uses: appleboy/ssh-action@v0.1.7
+#         with:
+#           host: ${{ secrets.SERVER_HOST }}
+#           username: ${{ secrets.SERVER_USER }}
+#           key: ${{ secrets.SERVER_SSH_KEY }}
+#           script_stop: true
+#           script: |
+#             set -e  # Exit if any command fails
+
+#             echo "🚀 Starting KlikyAI API Deployment..."
+
+#             PROJECT_PATH="/home/kliky/workingdir/prod/klikyai-api-v3"
+#             COMPOSE_FILE="$PROJECT_PATH/docker-compose.yaml"
+#             IMAGE_NAME="klikyai-api-v3"
+#             IMAGE_TAG="latest"
+
+#             echo "📂 Switching to project directory..."
+#             cd $PROJECT_PATH
+
+#             echo "🔐 Checking Git remote access..."
+#             git remote -v
+
+#             echo "🔄 Pulling latest code from branch..."
+#             # Ensure the server uses SSH for GitHub, not HTTPS
+#             git remote set-url origin git@github.com:KlikyAI/klikyai-api-v3.git
+#             git fetch origin main
+#             git reset --hard origin/main
+
+#             echo "🧹 Stopping running containers..."
+#             docker compose -f $COMPOSE_FILE down
+ 
+#             echo "⚙️ Building fresh Docker image..."
+#             docker compose -f $COMPOSE_FILE build --no-cache
+
+#             echo "🚀 Starting updated containers..."
+#             docker compose -f $COMPOSE_FILE up -d
+
+#             echo "⏳ Waiting 10 seconds before starting health checks..."
+#             sleep 10
+
+#             echo "⏳ Checking API health..."
+#             HEALTH_URL="https://generator.klikyai.app/dev/v3/health"
+#             MAX_RETRIES=15
+#             RETRY_DELAY=10
+#             HEALTH_OK=false
+
+#             for i in $(seq 1 $MAX_RETRIES); do
+#               STATUS_CODE=$(curl -o /dev/null -s -w "%{http_code}" "$HEALTH_URL")
+#               if [ "$STATUS_CODE" = "200" ]; then
+#                 echo "✅ API is healthy (HTTP $STATUS_CODE)"
+#                 HEALTH_OK=true
+#                 break
+#               else
+#                 echo "Waiting for API to respond... ($i/$MAX_RETRIES)"
+#                 sleep $RETRY_DELAY
+#               fi
+#             done
+
+#             if [ "$HEALTH_OK" != true ]; then
+#               echo "❌ Health check failed after $MAX_RETRIES attempts."
+#               docker compose logs
+#               exit 1
+#             fi
+
+#             echo "🪣 Pushing image to Docker Hub..."
+#             docker compose -f $COMPOSE_FILE push
+
+#             echo "✅ Deployment completed successfully!"
